@@ -254,18 +254,6 @@ class SamsungTVDevice(MediaPlayerDevice):
             return SUPPORT_SAMSUNGTV | SUPPORT_TURN_ON
         return SUPPORT_SAMSUNGTV
 
-    def turn_off(self):
-        """Turn off media player."""
-        self._end_of_power_off = dt_util.utcnow() + timedelta(seconds=15)
-
-        self.send_key("KEY_POWEROFF")
-        # Force closing of remote session to provide instant UI feedback
-        try:
-            self.get_remote().close()
-            self._remote = None
-        except OSError:
-            _LOGGER.debug("Could not establish connection.")
-
     def volume_up(self):
         """Volume up the media player."""
         self.send_key("KEY_VOLUP")
@@ -323,6 +311,18 @@ class SamsungTVDevice(MediaPlayerDevice):
         else:
             _LOGGER.error("Unsupported media type")
             return
+
+    def turn_off(self):
+        """Turn off media player."""
+        self._end_of_power_off = dt_util.utcnow() + timedelta(seconds=15)
+
+        self.send_key("KEY_POWEROFF")
+        # Force closing of remote session to provide instant UI feedback
+        try:
+            self.get_remote().close()
+            self._remote = None
+        except OSError:
+            _LOGGER.debug("Could not establish connection.")
 
     def turn_on(self):
         """Turn the media player on."""
