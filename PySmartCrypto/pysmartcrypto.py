@@ -11,14 +11,9 @@ class PySmartCrypto():
     UserId = "654321"
     AppId = "12345"
     deviceId =  "7e509404-9d7c-46b4-8f6a-e2a9668ad184"
-    tvIP = "10.0.0.41"
-    tvPort = "8080"
-    Token = "0"
-    SessionID = "0"
 
-    lastRequestId = 0
     def getFullUrl(self, urlPath):
-        return "http://"+ self.tvIP + ":" + self.tvPort+urlPath
+        return "http://" + self._host + ":" + self._port + urlPath
 
     def GetFullRequestUri(self, step, appId, deviceId):
         return self.getFullUrl("/ws/pairing?step="+str(step)+"&app_id="+appId+"&device_id="+deviceId)
@@ -42,13 +37,13 @@ class PySmartCrypto():
         firstStepResponse = requests.get(firstStepURL).text
 
     def StartPairing(self):
-        global lastRequestId
-        lastRequestId=0
+        self._lastRequestId=0
         if self.CheckPinPageOnTv():
             print("Pin NOT on TV")
             self.ShowPinPageOnTv()
         else:
             print("Pin ON TV");
+
     def HelloExchange(self, pin):
         hello_output = crypto.generateServerHello(self.UserId,pin)
         if not hello_output:
@@ -67,7 +62,7 @@ class PySmartCrypto():
 
     def AcknowledgeExchange(self, SKPrime):
         serverAckMessage = crypto.generateServerAcknowledge(SKPrime)
-        content="{\"auth_Data\":{\"auth_type\":\"SPC\",\"request_id\":\"" + str(lastRequestId) + "\",\"ServerAckMsg\":\"" + serverAckMessage + "\"}}"
+        content="{\"auth_Data\":{\"auth_type\":\"SPC\",\"request_id\":\"" + str(self._lastRequestId) + "\",\"ServerAckMsg\":\"" + serverAckMessage + "\"}}"
         thirdStepURL = self.GetFullRequestUri(2, self.AppId, self.deviceId)
         thirdStepResponse = requests.post(thirdStepURL, content).text
         if "secure-mode" in thirdStepResponse:
@@ -91,49 +86,21 @@ class PySmartCrypto():
         return False
 
 
-    def send_command(self, session_id, ctx, key_command):
-        ctx = ctx.upper()
-
+    def connect(self):
         millis = int(round(time.time() * 1000))
-        step4_url = 'http://' + self.tvIP + ':8000/socket.io/1/?t=' + str(millis)
+        step4_url = 'http://' + self._host + ':8000/socket.io/1/?t=' + str(millis)
         websocket_response = requests.get(step4_url)
-        websocket_url = 'ws://' + self.tvIP + ':8000/socket.io/1/websocket/' + websocket_response.text.split(':')[0]
+        websocket_url = 'ws://' + self._host + ':8000/socket.io/1/websocket/' + websocket_response.text.split(':')[0]
         print(websocket_url)
-
-        aesLib = AESCipher(ctx, session_id)
-        connection = websocket.create_connection(websocket_url)
-        time.sleep(0.35)
-        # need sleeps cuz if you send commands to quick it fails
-        connection.send('1::/com.samsung.companion')
         # pairs to this app with this command.
-        time.sleep(0.35)
-
-        connection.send(aesLib.generate_command(key_command))
-        time.sleep(0.35)
-
-        connection.close()
+        connection = websocket.create_connection(websocket_url)
+        connection.send('1::/com.samsung.companion')
+        return connection
 
     def control(self, key_command):
-        ctx = self.Token.upper()
-
-        millis = int(round(time.time() * 1000))
-        step4_url = 'http://' + self.tvIP + ':8000/socket.io/1/?t=' + str(millis)
-        websocket_response = requests.get(step4_url)
-        websocket_url = 'ws://' + self.tvIP + ':8000/socket.io/1/websocket/' + websocket_response.text.split(':')[0]
-        print(websocket_url)
-
-        aesLib = AESCipher(ctx, self.SessionID)
-        connection = websocket.create_connection(websocket_url)
-        time.sleep(0.35)
+        self._connection.send(self._aesLib.generate_command(key_command))
         # need sleeps cuz if you send commands to quick it fails
-        connection.send('1::/com.samsung.companion')
-        # pairs to this app with this command.
-        time.sleep(0.35)
-
-        connection.send(aesLib.generate_command(key_command))
-        time.sleep(0.35)
-
-        connection.close()
+        time.sleep(0.1)
 
     def __enter__(self):
         return self
@@ -143,35 +110,41 @@ class PySmartCrypto():
 
     def close(self):
         """Close the connection."""
-        return(self)
+        self._connection.close()
 
-    def __init__(self, ip, port, ctx=None, currentSessionId=None, command=None):
-        self.tvIP = ip
-        self.tvPort = port
-        if ctx is None and currentSessionId is None:
+    def __init__(self, host, port, token=None, sessionid=None, command=None):
+        self._lastRequestId = 0
+
+        self._host = host
+        self._port = port
+        self._connection = self.connect()
+
+        if token is None and sessionid is None:
             self.StartPairing()
-            ctx = False
+            token = False
             SKPrime = False
-            while not ctx:
+            while not token:
                 tvPIN = input("Please enter pin from tv: ")
                 print("Got pin: '"+tvPIN+"'\n")
                 self.FirstStepOfPairing()
                 output = self.HelloExchange(tvPIN)
                 if output:
-                    ctx = output['ctx'].hex()
+                    token = output['ctx'].hex()
                     SKPrime = output['SKPrime']
-                    print("ctx: " + ctx)
+                    print("ctx: " + token)
                     print("Pin accepted :)\n")
                 else:
                     print("Pin incorrect. Please try again...\n")
 
-            currentSessionId = self.AcknowledgeExchange(SKPrime)
-            print("SessionID: " + str(currentSessionId))
+            sessionid = self.AcknowledgeExchange(SKPrime)
+            print("SessionID: " + str(sessionid))
             self.ClosePinPageOnTv()
             print("Authorization successfull :)\n")
 
-        self.Token = ctx
-        self.SessionID = currentSessionId
+        self._token = token
+        self._sessionid = sessionid
+
+        self._aesLib = AESCipher(self._token.upper(), self._sessionid)
 
         if command is not None:
             print('Attempting to send command to tv')

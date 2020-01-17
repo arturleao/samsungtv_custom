@@ -115,7 +115,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         mac = config.get(CONF_MAC)
         timeout = config.get(CONF_TIMEOUT)
         token = config.get(CONF_TOKEN)
-        sessionId = config.get(CONF_SESSIONID)
+        sessionid = config.get(CONF_SESSIONID)
     elif discovery_info is not None:
         tv_name = discovery_info.get("name")
         model = discovery_info.get("model_name")
@@ -124,7 +124,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         port = DEFAULT_PORT
         timeout = DEFAULT_TIMEOUT
         token = "0"
-        sessionId = "0"
+        sessionid = "0"
         mac = None
         udn = discovery_info.get("udn")
         if udn and udn.startswith("uuid:"):
@@ -138,7 +138,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     ip_addr = socket.gethostbyname(host)
     if ip_addr not in known_devices:
         #known_devices.add(ip_addr)
-        add_entities([SamsungTVDevice(host, port, name, timeout, mac, uuid, sourcelist, token, sessionId)])
+        add_entities([SamsungTVDevice(host, port, name, timeout, mac, uuid, sourcelist, token, sessionid)])
         _LOGGER.info("Samsung TV %s:%d added as '%s'", host, port, name)
     else:
         _LOGGER.info("Ignoring duplicate Samsung TV %s:%d", host, port)
@@ -146,11 +146,13 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class SamsungTVDevice(MediaPlayerDevice):
     """Representation of a Samsung TV."""
 
-    def __init__(self, host, port, name, timeout, mac, uuid, sourcelist, token, sessionId):
+    def __init__(self, host, port, name, timeout, mac, uuid, sourcelist, token, sessionid):
         """Initialize the Samsung device."""
         # Save a reference to the imported classes
-        self._token = token #"02e6c1f78a2972ef989ea5745ca7182e"
-        self._sessionId = sessionId #"1"
+        self._host = host
+        self._port = port
+        self._token = token
+        self._sessionid = sessionid
         self._remote_class = PySmartCrypto
         self._name = name
         self._mac = mac
@@ -184,7 +186,7 @@ class SamsungTVDevice(MediaPlayerDevice):
         """Create or return a remote control instance."""
         if self._remote is None:
             # We need to create a new instance to reconnect.
-            self._remote = self._remote_class(self._config["host"], self._config["port"], self._token, self._sessionId)
+            self._remote = self._remote_class(self._host, self._port, self._token, self._sessionid)
 
         return self._remote
 
