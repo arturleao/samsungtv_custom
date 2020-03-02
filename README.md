@@ -37,3 +37,7 @@ Feel free to contribute with other working models and to submit fixes and improv
 
 #### Working Models
 - UE55H6400
+- UE40H6200 (caveat: off-state detection, see Issue #1)
+- UE48H5500AW (caveat: off-state detection, see Issue #1)
+- 55HU7500 (caveat: off-state detection, see Issue #1)
+- HU8550 (caveat: off-state detection, see Issue #1)
