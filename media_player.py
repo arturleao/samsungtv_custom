@@ -10,6 +10,7 @@ import websocket
 import wakeonlan
 import time
 import requests
+import subprocess
 
 from .PySmartCrypto.pysmartcrypto import PySmartCrypto
 
@@ -182,6 +183,16 @@ class SamsungTVDevice(MediaPlayerDevice):
         """Update state of device."""
         self.send_key("KEY")
 
+    def pingTV(self):
+        """ping TV"""
+        cmd = ['ping', '-c1', '-W2', self._host ]
+        response = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        stdout, stderr = response.communicate()
+        if response.returncode == 0:   
+            return True
+        else:
+            return False
+        
     def get_remote(self):
         """Create or return a remote control instance."""
         if self._remote is None:
@@ -195,6 +206,14 @@ class SamsungTVDevice(MediaPlayerDevice):
         if self._power_off_in_progress() and key not in ("KEY_POWER", "KEY_POWEROFF"):
             _LOGGER.info("TV is powering off, not sending command: %s", key)
             return
+        
+        # first try pinging the TV
+        if not self.pingTV():
+            self._state = STATE_OFF
+            #self.get_remote().close()
+            self._remote = None
+            return
+        
         try:
             # recreate connection if connection was dead
             retry_count = 1
